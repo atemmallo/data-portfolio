@@ -1,0 +1,634 @@
+---
+title: "Final Project"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-05-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r }
+# Import Libraries
+
+# Uncomment these lines then run the whole cell
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("dplyr")
+#install.packages("gridExtra")
+#install.packages("zoo")
+#install.packages("car")
+
+library(zoo)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(car)
+
+```
+
+
+```{r }
+data <- read.csv("Life Expectancy Data.csv")
+head(data)
+```
+
+```{r }
+data <- read.csv("Life Expectancy Data.csv")
+head(data)
+```
+
+```{r data}
+data <- read.csv("Life Expectancy Data.csv")
+head(data)
+```
+
+
+
+```{r }
+# Dimensions
+dim(data)
+```
+
+```{r }
+# Dataset columns and types
+str(data)
+
+```
+
+```{r }
+# Renaming Columns
+data <- data %>%
+    rename('Life_Expectancy'='Life.expectancy',
+    'Total_Expenditure'='Total.expenditure',
+    'Hepatitis_B'='Hepatitis.B')
+head(data)
+
+```
+
+```{r }
+# Filter by selected variables
+data <- data[, c("Country","Year","Status","GDP","Total_Expenditure", "Schooling", "BMI","Alcohol","Hepatitis_B","Polio","Diphtheria","Life_Expectancy")]
+dim(data)
+head(data)
+
+```
+
+```{r }
+# Checking for missing values
+for (col in names(data)) {
+  missing_count <- sum(is.na(data[[col]]))
+  cat(col, ":", missing_count, "\n")
+}
+
+```
+
+```{r }
+# Copied this code from Reference 1
+
+# Data frame with the count of missing values for each feature
+missing_counts <- data.frame(feature = factor(names(data)),
+                             counts = sapply(data, function(x) sum(is.na(x))))
+
+# Dimensions of the plot
+options(repr.plot.width = 16, repr.plot.height = 8)
+
+# Creates a bar plot of missing counts for each feature using missing_counts dataframe
+
+# Initialize ggplot with missing_counts, reorder features by counts, set y-axis to counts and fill by counts
+ggplot(missing_counts, aes(x = reorder(feature, -counts), y = counts, fill = counts)) +
+  # Missing value counts for bar height
+  geom_bar(stat = "identity") +
+  # Title
+  ggtitle("Missing counts in each feature") +
+  # Axes
+  xlab("Feature") + ylab("Missing count") +
+  # Theme/color stuff
+  theme(axis.text.x = element_text(angle = 20, hjust = 1, size = 20),
+        axis.text.y = element_text(size = 30),
+        text = element_text(size = 30)) +
+  scale_fill_continuous(trans = 'reverse')
+
+
+```
+
+```{r }
+# Remove rows where Life Expectancy is empty
+data <- data %>% filter(!is.na(Life_Expectancy))
+
+#Remove 2015 from year: most of the missing values in total expenditure and alcohol are from 2015
+
+data <- data %>%
+  filter(Year != 2015)
+
+```
+
+```{r }
+# Mean Imputation Diphtheria. Reason: Two countries with some missing vals: Montenegro, Timor Lester. Less variability, with one outlier observation, no linear pattern, used mean instead
+data <- data %>%
+  group_by(Country) %>%
+  mutate(Diphtheria = ifelse(is.na(Diphtheria), mean(Diphtheria, na.rm = TRUE), Diphtheria)) %>%
+  ungroup()  # Ungroup after the operation
+
+# Mean Imputation Polio. Reason: Two countries with some missing vals: Montenegro, Timor Lester. Less variability, with one outlier observation, linear pattern observed
+data <- data %>%
+  group_by(Country) %>%
+  mutate(Polio = ifelse(is.na(Polio), mean(Polio, na.rm = TRUE), Polio)) %>%
+  ungroup()  # Ungroup after the operation
+
+#Next Observation Carried Backward for Alcohol. Reason: Only 1 missing value related to Montenegro, there is no linear pattern and the data has some stark jumps
+data$Alcohol <- na.locf(data$Alcohol,fromLast = TRUE)
+
+#new missing count
+for (col in names(data)) {
+  missing_count <- sum(is.na(data[[col]]))
+  cat(col, ":", missing_count, "\n")
+}
+
+#Parital deletion for BMI, GDP, Schooling, Hep_B, Total Expenditure
+
+```
+
+```{r }
+#Data for regression
+
+data_for_regression <- na.omit(data)
+
+dim(data_for_regression)
+
+```
+
+```{r}
+#Data columns without NA to use for plots
+Hepatitis_B_notNA <- data$Hepatitis_B[!is.na(data$Hepatitis_B)]
+GDP_notNA <- data$GDP[!is.na(data$GDP)]
+Total_Expenditure_notNA <- data$Total_Expenditure[!is.na(data$Total_Expenditure)]
+Schooling_notNA <- data$Schooling[!is.na(data$Schooling)]
+BMI_notNA <- data$BMI[!is.na(data$BMI)]
+```
+
+```{r}
+# Boxplots
+par(mfrow = c(2, 3))
+
+boxplot(data$Year,
+        ylab = "Year",
+        main = "Boxplot of Year")
+
+# Distribution for Status
+boxplot(Life_Expectancy ~ Status, data = data, col = c("blue", "red"))
+
+# Hepatitis_B
+boxplot(Hepatitis_B_notNA,
+        ylab = "Hepatitis_B",
+        main = "Boxplot of Hepatitis_B")
+
+# GDP
+boxplot(GDP_notNA,
+        ylab = "GDP",
+        main = "Boxplot of GDP")
+
+# Total Expenditure
+boxplot(Total_Expenditure_notNA,
+        ylab = "Total Expenditure",
+        main = "Boxplot of Total Expenditure")
+
+# Alcohol
+boxplot(data$Alcohol,
+        ylab = "Alcohol",
+        main = "Boxplot of Alcohol")
+
+# Schooling
+boxplot(Schooling_notNA,
+        ylab = "Schooling",
+        main = "Boxplot of Schooling")
+
+# BMI
+boxplot(BMI_notNA,
+        ylab = "BMI",
+        main = "Boxplot of BMI")
+
+# Diphtheria
+boxplot(data$Diphtheria,
+        ylab = "Diphtheria",
+        main = "Boxplot of Diphtheria")
+
+# Polio
+boxplot(data$Polio,
+        ylab = "Polio",
+        main = "Boxplot of Polio")
+
+# Life Expectancy
+boxplot(data$Life_Expectancy,
+        ylab = "Life Expectancy",
+        main = "Boxplot of Life Expectancy")
+```
+
+```{r}
+#Mean calculation
+Hepatitis_B_mean <- mean(data$Hepatitis_B, na.rm = TRUE)
+BMI_mean <- mean(data$BMI, na.rm = TRUE)
+Total_Expenditure_mean <- mean(data$Total_Expenditure, na.rm = TRUE)
+Alcohol_mean <- mean(data$Alcohol, na.rm = TRUE)
+GDP_mean <- mean(data$GDP, na.rm = TRUE)
+Schooling_mean <- mean(data$Schooling, na.rm = TRUE)
+Diphtheria_mean <- mean(data$Diphtheria, na.rm = TRUE)
+Polio_mean <- mean(data$Polio, na.rm = TRUE)
+Life_Expectancy_mean <- mean(data$Life_Expectancy)
+Year_mean <- mean(data$Year)
+
+# Median calculation
+Hepatitis_B_median <- median(data$Hepatitis_B,na.rm = TRUE)
+BMI_median <- median(data$BMI,na.rm = TRUE)
+Total_Expenditure_median <- median(data$Total_Expenditure,na.rm = TRUE)
+Alcohol_median <- median(data$Alcohol,na.rm = TRUE)
+GDP_median <- median(data$GDP,na.rm = TRUE)
+Schooling_median <- median(data$Schooling,na.rm = TRUE)
+Diphtheria_median <- median(data$Diphtheria,na.rm = TRUE)
+Polio_median <- median(data$Polio,na.rm = TRUE)
+Life_Expectancy_median <- median(data$Life_Expectancy)
+Year_median <- median(data$Year)
+
+#Mode calulation
+get_mode <- function(x) {
+  x <- na.omit(x)
+  uniqx <- unique(x)
+  uniqx[which.max(tabulate(match(x, uniqx)))]
+}
+
+
+Hepatitis_B_mode <- get_mode(data$Hepatitis_B)
+GDP_mode <- get_mode(data$GDP)
+BMI_mode <- get_mode(data$BMI)
+Total_Expenditure_mode <- get_mode(data$Total_Expenditure)
+Alcohol_mode <- get_mode(data$Alcohol)
+Schooling_mode <- get_mode(data$Schooling)
+Diphtheria_mode <- get_mode(data$Diphtheria)
+Polio_mode <- get_mode(data$Polio)
+Life_Expectancy_mode <- get_mode(data$Year)
+Year_mode <- get_mode(data$Life_Expectancy)
+
+
+
+#Summary statistics
+summary_stats_mct <- data.frame(
+  Variable = c("Hepatitis_B", "GDP", "Total_Expenditure", "Alcohol",
+               "Schooling", "BMI", "Diphtheria", "Polio", "Life_Expectancy","Year"),
+  Mean = c(Hepatitis_B_mean, GDP_mean, Total_Expenditure_mean, Alcohol_mean,
+             Schooling_mean,BMI_mean, Diphtheria_mean, Polio_mean, Life_Expectancy_mean,Year_mean),
+  Median = c(Hepatitis_B_median, GDP_median, Total_Expenditure_median, Alcohol_median,
+             Schooling_median,BMI_median, Diphtheria_median, Polio_median, Life_Expectancy_median,Year_median),
+  Mode = c(Hepatitis_B_mode, GDP_mode, Total_Expenditure_mode, Alcohol_mode,
+           Schooling_mode,BMI_mode, Diphtheria_mode, Polio_mode, Life_Expectancy_mode, Year_mode)
+)
+
+print(summary_stats_mct)
+
+```
+
+```{r}
+##Summary statistics
+#SD
+Hepatitis_B_sd <- sd(data$Hepatitis_B, na.rm = TRUE)
+GDP_sd <- sd(data$GDP, na.rm = TRUE)
+BMI_sd<-sd(data$BMI, na.rm=TRUE)
+Total_Expenditure_sd <- sd(data$Total_Expenditure, na.rm = TRUE)
+Alcohol_sd <- sd(data$Alcohol, na.rm = TRUE)
+Schooling_sd <- sd(data$Schooling, na.rm = TRUE)
+Diphtheria_sd <- sd(data$Diphtheria, na.rm = TRUE)
+Polio_sd <- sd(data$Polio, na.rm = TRUE)
+Life_Expectancy_sd <- sd(data$Life_Expectancy)
+Year_sd <- sd(data$Year)
+
+#Min
+Hepatitis_B_min <- min(data$Hepatitis_B, na.rm = TRUE)
+GDP_min <- min(data$GDP, na.rm = TRUE)
+BMI_min <- min(data$BMI, na.rm = TRUE)
+Total_Expenditure_min <- min(data$Total_Expenditure, na.rm = TRUE)
+Alcohol_min <- min(data$Alcohol, na.rm = TRUE)
+Schooling_min <- min(data$Schooling, na.rm = TRUE)
+Diphtheria_min <- min(data$Diphtheria, na.rm = TRUE)
+Polio_min <- min(data$Polio, na.rm = TRUE)
+Life_Expectancy_min <- min(data$Life_Expectancy)
+Year_min <- min(data$Year)
+
+#Max
+Hepatitis_B_max <- max(data$Hepatitis_B, na.rm = TRUE)
+GDP_max <- max(data$GDP, na.rm = TRUE)
+BMI_max <- max(data$BMI, na.rm = TRUE)
+Total_Expenditure_max <- max(data$Total_Expenditure, na.rm = TRUE)
+Alcohol_max <- max(data$Alcohol, na.rm = TRUE)
+Schooling_max <- max(data$Schooling, na.rm = TRUE)
+Diphtheria_max <- max(data$Diphtheria, na.rm = TRUE)
+Polio_max <- max(data$Polio, na.rm = TRUE)
+Year_min <- max(data$Year)
+Life_Expectancy_max <- max(data$Life_Expectancy, na.rm = TRUE)
+
+#Q1, Q3
+Hepatitis_B_Q1 <- quantile(data$Hepatitis_B, probs = 0.25, na.rm = TRUE)
+GDP_Q1 <- quantile(data$GDP, probs = 0.25, na.rm = TRUE)
+BMI_Q1 <- quantile(data$BMI, probs = 0.25, na.rm = TRUE)
+Total_Expenditure_Q1 <- quantile(data$Total_Expenditure, probs = 0.25, na.rm = TRUE)
+Alcohol_Q1 <- quantile(data$Alcohol, probs = 0.25, na.rm = TRUE)
+Schooling_Q1 <- quantile(data$Schooling, probs = 0.25, na.rm = TRUE)
+Diphtheria_Q1 <- quantile(data$Diphtheria, probs = 0.25, na.rm = TRUE)
+Polio_Q1 <- quantile(data$Polio, probs = 0.25, na.rm = TRUE)
+Life_Expectancy_Q1 <- quantile(data$Life_Expectancy, probs = 0.25, na.rm = TRUE)
+Year_Q1<- quantile(data$Year, probs = 0.25, na.rm = TRUE)
+
+Hepatitis_B_Q3 <- quantile(data$Hepatitis_B, probs = 0.75, na.rm = TRUE)
+GDP_Q3 <- quantile(data$GDP, probs = 0.75, na.rm = TRUE)
+BMI_Q3 <- quantile(data$BMI, probs = 0.75, na.rm = TRUE)
+Total_Expenditure_Q3 <- quantile(data$Total_Expenditure, probs = 0.75, na.rm = TRUE)
+Alcohol_Q3 <- quantile(data$Alcohol, probs = 0.75, na.rm = TRUE)
+Schooling_Q3 <- quantile(data$Schooling, probs = 0.75, na.rm = TRUE)
+Diphtheria_Q3 <- quantile(data$Diphtheria, probs = 0.75, na.rm = TRUE)
+Polio_Q3 <- quantile(data$Polio, probs = 0.75, na.rm = TRUE)
+Life_Expectancy_Q3 <- quantile(data$Life_Expectancy, probs = 0.75, na.rm = TRUE)
+Year_Q3<- quantile(data$Year, probs = 0.75, na.rm = TRUE)
+
+#RANGE
+Hepatitis_B_range <- diff(range(data$Hepatitis_B, na.rm = TRUE))
+GDP_range <- diff(range(data$GDP, na.rm = TRUE))
+BMI_range <- diff(range(data$BMI, na.rm = TRUE))
+Total_Expenditure_range <- diff(range(data$Total_Expenditure, na.rm = TRUE))
+Alcohol_range <- diff(range(data$Alcohol, na.rm = TRUE))
+Schooling_range <- diff(range(data$Schooling, na.rm = TRUE))
+Diphtheria_range <- diff(range(data$Diphtheria, na.rm = TRUE))
+Polio_range <- diff(range(data$Polio, na.rm = TRUE))
+Life_Expectancy_range <- diff(range(data$Life_Expectancy, na.rm = TRUE))
+Year_range <- diff(range(data$Year, na.rm = TRUE))
+
+
+summary_stats_spread <- data.frame(
+  Variable = c("Hepatitis_B", "GDP", "BMI", "Total_Expenditure", "Alcohol", "Schooling",
+               "Diphtheria", "Polio", "Life_Expectancy","Year"),
+  SD = c(Hepatitis_B_sd, GDP_sd, BMI_sd, Total_Expenditure_sd, Alcohol_sd, Schooling_sd,
+         Diphtheria_sd, Polio_sd, Life_Expectancy_sd,Year_sd),
+  Q1 = c(Hepatitis_B_Q1, GDP_Q1, BMI_Q1, Total_Expenditure_Q1, Alcohol_Q1, Schooling_Q1,
+         Diphtheria_Q1, Polio_Q1, Life_Expectancy_Q1,Year_Q1),
+  Q3 = c(Hepatitis_B_Q3, GDP_Q3, BMI_Q3, Total_Expenditure_Q3, Alcohol_Q3, Schooling_Q3,
+         Diphtheria_Q3, Polio_Q3, Life_Expectancy_Q3,Year_Q3),
+  Range = c(Hepatitis_B_range, GDP_range, BMI_range, Total_Expenditure_range, Alcohol_range,
+            Schooling_range, Diphtheria_range, Polio_range, Life_Expectancy_range,Year_range)
+)
+
+# View the summary stats
+print(summary_stats_spread)
+```
+
+```{r}
+# Histograms
+par(mfrow = c(3, 2))
+
+
+# Hepatitis_B
+hist(Hepatitis_B_notNA,
+     main = "Distribution of Hepatitis_B",
+     xlab = "Hepatitis_B",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Hepatitis_B_median, col = "blue", lwd = 2)
+
+# Diphetheria
+hist(data$Diphtheria,
+     main = "Distribution of Diphtheria",
+     xlab = "Diphtheria",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Hepatitis_B_median, col = "blue", lwd = 2)
+
+# Polio
+hist(data$Polio,
+     main = "Distribution of Polio",
+     xlab = "Polio",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Hepatitis_B_median, col = "blue", lwd = 2)
+
+# GDP
+hist(GDP_notNA,
+     main = "Distribution of GDP",
+     xlab = "GDP",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = GDP_median, col = "blue", lwd = 2)
+
+# Total Expenditure
+hist(Total_Expenditure_notNA,
+     main = "Distribution of Total Expenditure",
+     xlab = "Total Expenditure",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Total_Expenditure_median, col = "blue", lwd = 2)
+
+# Alcohol
+hist(data$Alcohol,
+     main = "Distribution of Alcohol",
+     xlab = "Alcohol",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Alcohol_median, col = "blue", lwd = 2)
+
+# Schooling
+hist(Schooling_notNA,
+     main = "Distribution of Schooling",
+     xlab = "Schooling",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Schooling_median, col = "blue", lwd = 2)
+
+# BMI
+hist(BMI_notNA,
+     main = "Distribution of BMI",
+     xlab = "BMI",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = BMI_mean, col = "blue", lwd = 2)
+
+# Life Expectancy
+hist(data$Life_Expectancy,
+     main = "Distribution of Life Expectancy",
+     xlab = "Life Expectancy",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Life_Expectancy_median, col = "blue", lwd = 2)
+
+# Year
+hist(data$Year,
+     main = "Distribution of Year",
+     xlab = "Life Expectancy",
+     col = "#FF6666", border = "black",
+     cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+abline(v = Year_median, col = "blue", lwd = 2)
+
+```
+
+
+```{r }
+
+#Summary Stats for Categorical Data
+
+status_count <- table(data$Status) # Count of each category
+status_proportion <- prop.table(status_count)
+
+cat("Counts of Status:\n")
+print(status_count)
+
+cat("\nProportions of Status:\n")
+print(status_proportion)
+```
+
+
+```{r }
+# Encode categorical varaible status by factorizing it
+data$Status <- as.factor(data$Status)
+
+```
+
+```{r }
+# QQ plots
+par(mfrow = c(2, 3))
+
+# Hepatitis_B
+qqnorm(Hepatitis_B_notNA, main = "Hepatitis_B", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(Hepatitis_B_notNA, col = "#FF6666")
+
+# GDP
+qqnorm(GDP_notNA, main = "GDP", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(GDP_notNA, col = "#FF6666")
+
+# Total Expenditure
+qqnorm(Total_Expenditure_notNA, main = "Total Expenditure", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(Total_Expenditure_notNA, col = "#FF6666")
+
+# Alcohol
+qqnorm(data$Alcohol, main = "Alcohol", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(data$Alcohol, col = "#FF6666")
+
+# Schooling
+qqnorm(Schooling_notNA, main = "Schooling", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(Schooling_notNA, col = "#FF6666")
+
+# Polio
+qqnorm(data$Polio, main = "Polio", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(data$Polio, col = "#FF6666")
+
+# Diphtheria
+qqnorm(data$Diphtheria, main = "Diphtheria", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(data$Diphtheria, col = "#FF6666")
+
+# BMI
+qqnorm(BMI_notNA, main = "BMI", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(BMI_notNA, col = "#FF6666")
+
+#Year
+qqnorm(data$Year, main = "BMI", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(BMI_notNA, col = "#FF6666")
+
+# Life Expectancy
+qqnorm(data$Life_Expectancy, main = "Life Expectancy", cex.main = 2, cex.lab = 1.5, cex.axis = 1.2)
+qqline(data$Life_Expectancy, col = "#FF6666")
+
+```
+
+```{r }
+#pairs just automatically uses pairwise deletion
+
+group1 <- data[, c("Year","GDP", "Schooling", "Total_Expenditure", "Life_Expectancy")]
+
+group2 <- data[, c("Year","BMI", "Alcohol", "Life_Expectancy")]
+
+group3 <- data[, c("Year", "Hepatitis_B","Diphtheria", "Polio", "Life_Expectancy")]
+
+pairs(group1, main = "Scatterplot Matrix: Economic Indicators")
+pairs(group2, main = "Scatterplot Matrix: Health Indicators")
+pairs(group3, main = "Scatterplot Matrix: Immunizations")
+
+
+```
+
+```{r }
+cor_matrix_pairwise_group1 <- cor(group1, use = "pairwise.complete.obs", method = "pearson")
+cor_matrix_pairwise_group2<- cor(group2, use = "pairwise.complete.obs", method = "pearson")
+cor_matrix_pairwise_group3 <- cor(group3, use = "pairwise.complete.obs", method = "pearson")
+
+print(cor_matrix_pairwise_group1)
+print(cor_matrix_pairwise_group2)
+print(cor_matrix_pairwise_group3)
+
+```
+
+```{r }
+#Regression Data summary
+Y <- data_for_regression$Life_Expectancy
+X <- model.matrix(~Year + Status + GDP + Total_Expenditure + Schooling + BMI + Alcohol + Hepatitis_B + Polio + Diphtheria, data_for_regression)
+
+```
+
+```{r}
+#Multiple Linear Regression Model
+mod_1 <- lm(Life_Expectancy ~ Year + Status + GDP + Total_Expenditure + Schooling + BMI + Alcohol + Hepatitis_B + Polio + Diphtheria, data_for_regression)
+summary(mod_1)
+```
+
+```{r }
+vif_results <- vif(mod_1)
+print("VIF for Original Model:")
+print(vif_results)
+
+```
+
+
+```{r}
+#Residuals from model 1
+residuals_mod1 <- mod_1$residuals
+hist(residuals_mod1,
+     main = "Histogram of Residuals",
+     xlab = "Residuals",
+     col = "lightblue",
+     border = "black")
+qqnorm(residuals_mod1,
+       main = "Q-Q Plot of Residuals",
+       ylab = "Sample Quantiles",
+       xlab = "Theoretical Quantiles",
+       col = "blue")
+qqline(residuals_mod1, col = "red", lwd = 2)
+
+boxplot(residuals_mod1,
+        main = "Boxplot of Residuals",
+        ylab = "Residuals",
+        col = "lightblue",
+        border = "black")
+
+plot(mod_1$fitted.values, mod_1$residuals,
+     main = "Residuals vs Fitted Plot",
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     pch = 16,   # Type of points (solid circle)
+     col = "blue")
+
+abline(h = 0, col = "red", lty = 2)
+```
+
+
+```{r }
+#Interaction of Status with other predictors
+mod_2_StatusSchooling <- lm(Life_Expectancy ~ Year + GDP + Total_Expenditure + Status*Schooling + BMI + Alcohol + Hepatitis_B + Polio + Diphtheria, data_for_regression)
+summary(mod_2_StatusSchooling) #very statistically significant from the results
+```
+
+
+```{r}
+#To incorporate feedback in methods
+
+res <- residuals(mod_1)
+which(res < -10)
+data_for_regression[res < -10, ]
+data_for_regression[res > 20, ]
+
+```
