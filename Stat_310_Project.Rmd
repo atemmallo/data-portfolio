@@ -1,0 +1,437 @@
+---
+title: "310_Project"
+author: "Andrew Temmallo"
+date: "2024-12-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(infer)
+library(readxl)
+library(moderndive)
+library(ggplot2)
+library(dplyr)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+Camden_data <- yg821jf8611_nj_camden_2020_04_01 %>% 
+  select(raw_row_number,date,subject_race,raw_race,raw_ethnicity,arrest_made,citation_issued,warning_issued)
+NJ_statewide_data <- yg821jf8611_nj_statewide_2020_04_01
+pa_philadelphia_data_2020_04_01 <- read_csv("Stat 310/Project/yg821jf8611_pa_philadelphia_2020_04_01.csv/pa_philadelphia_2020_04_01.csv")
+Philadelphia_data <- pa_philadelphia_data_2020_04_01 %>% 
+  select(raw_row_number, date, subject_race, raw_race, arrest_made, search_conducted)
+```
+
+```{r}
+Philadelphia_data <- Philadelphia_data %>% 
+  filter(subject_race == "white" | subject_race == "black") %>% 
+  filter(date >= '2016-01-01' & date < '2017-01-01') %>%   
+  mutate(arrest_made = as.numeric(arrest_made)) %>% 
+  mutate(search_conducted = as.numeric(search_conducted))
+Philadelphia_white_data <- Philadelphia_data %>% 
+  filter(subject_race == "white")
+Philadelphia_black_data <- Philadelphia_data %>% 
+  filter(subject_race == "black")
+```
+
+```{r}
+#Calculate test statistics for subject_race == white
+Philadelphia_white_data %>% 
+  summarize(white_search_prop = mean(search_conducted))
+```
+```{r}
+#Calculate test statistics for subject_race == black
+Philadelphia_black_data %>% 
+  summarize(black_search_prop = mean(search_conducted))
+```
+
+
+```{r}
+#Create bootstrap samples
+bootstrap_samples <- Philadelphia_white_data %>% 
+  rep_sample_n(size = 85400, replace = TRUE, reps = 1000)
+
+# Find the search proportions for each bootstrap samples
+white_boot_props <- bootstrap_samples %>%
+  group_by(replicate) %>%
+  summarize(white_search_prop = mean(search_conducted))
+
+
+# Creates a Histogram of the search proportions of bootstrap samples.
+ggplot(white_boot_props, aes(x = white_search_prop)) +
+  geom_histogram(fill = "darkseagreen3", bins = 10, color = "white") + 
+  xlab("White Search Proportions in Bootstrap Samples") + 
+  ylab("Frequency") + 
+  theme_bw()
+
+```
+
+```{r}
+quantile(white_boot_props$white_search_prop, c(0.05, 0.95) )
+```
+
+
+
+```{r}
+#Create 50 bootsrap samples
+bootstrap_samples <- Philadelphia_black_data %>% 
+  rep_sample_n(size = 85400, replace = TRUE, reps = 1000)
+
+# Find the search proportions for each bootstrap samples
+black_boot_props <- bootstrap_samples %>%
+  group_by(replicate) %>%
+  summarize(black_search_prop = mean(search_conducted))
+
+
+# Creates a Histogram of the search proportions of bootstrap samples.
+ggplot(black_boot_props, aes(x = black_search_prop)) +
+  geom_histogram(fill = "darkseagreen3", bins = 10, color = "white") + 
+  xlab("Black Search Proportions in Bootstrap Samples") + 
+  ylab("Frequency") + 
+  theme_bw()
+
+```
+
+```{r}
+quantile(black_boot_props$black_search_prop, c(0.05, 0.95) )
+```
+
+
+```{r}
+nj_statewide_data <- NJ_statewide_data %>% 
+  filter(date >= '2016-01-01' & date < '2017-01-01')
+```
+
+```{r}
+camden_data <- nj_statewide_data %>%
+  filter(raw_TOWNSHIP == "Camden City") %>% 
+  mutate(search_conducted = if_else(is.na(search_conducted) | search_conducted == FALSE, 0, 1))
+                                   
+
+
+
+gloucester_county_data <- nj_statewide_data %>%
+  filter(raw_TOWNSHIP == "Washington Twp" |raw_TOWNSHIP == "Monroe Twp"  | raw_TOWNSHIP == "Deptford Twp") %>% 
+  mutate(search_conducted = if_else(is.na(search_conducted) | search_conducted == FALSE, 0, 1))
+
+
+
+cumberland_county_data <- nj_statewide_data %>%
+  filter(raw_TOWNSHIP == "Commercial Twp" | raw_TOWNSHIP == "Deerfield Twp"  | raw_TOWNSHIP == "Fairfield Twp") %>% 
+  mutate(search_conducted = if_else(is.na(search_conducted) | search_conducted == FALSE, 0, 1))
+
+capemay_county_data <- nj_statewide_data %>%
+  filter(raw_TOWNSHIP == "Lower Twp" |raw_TOWNSHIP == "Middle Twp") %>% 
+  mutate(search_conducted = if_else(is.na(search_conducted) | search_conducted == FALSE, 0, 1))
+
+salem_county_data <- nj_statewide_data %>%
+  filter(raw_TOWNSHIP == "Pennsville Twp" |raw_TOWNSHIP == "Pittsgrove Twp"  | raw_TOWNSHIP == "Carneys Point Twp") %>% 
+  mutate(search_conducted = if_else(is.na(search_conducted) | search_conducted == FALSE, 0, 1))
+```
+
+
+```{r}
+gloucester_county_data %>%
+  mutate(search_conducted = if_else(is.na(search_conducted) | search_conducted == FALSE, 0, 1)) %>%
+  group_by(subject_race) %>%
+  summarize(mean(search_conducted)) -> gloucester_search_prop
+
+cumberland_county_data %>%
+  mutate(search_conducted = if_else(is.na(search_conducted)| search_conducted == FALSE, 0, 1)) %>%
+  group_by(subject_race) %>%
+  summarize(mean(search_conducted)) -> cumberland_search_prop
+
+capemay_county_data %>%
+  mutate(search_conducted = if_else(is.na(search_conducted)| search_conducted == FALSE, 0, 1)) %>%
+  group_by(subject_race) %>%
+  summarize(mean(search_conducted)) -> capemay_search_prop
+
+salem_county_data %>%
+  mutate(search_conducted = if_else(is.na(search_conducted)| search_conducted == FALSE, 0, 1)) %>%
+  group_by(subject_race) %>%
+  summarize(mean(search_conducted)) -> salem_search_prop
+
+```
+
+
+```{r}
+# Filter data for Black and White
+filtered_gloucester <- gloucester_county_data %>%
+  filter(subject_race %in% c("black", "white")) %>% 
+  filter(!is.na(search_conducted) & !is.na(subject_race))
+
+
+# Observed proportions for Black and White
+observed_props <- filtered_gloucester %>%
+  group_by(subject_race) %>%
+  summarize(prop_searched = mean(search_conducted), .groups = "drop")
+
+# Extract observed proportion for Black
+observed_black_prop <- observed_props %>%
+  filter(subject_race == "black") %>%
+  pull(prop_searched)
+
+# Extract observed proportion for White
+observed_white_prop <- observed_props %>%
+  filter(subject_race == "white") %>%
+  pull(prop_searched)
+
+# Observed difference in proportions (Black - White)
+observed_diff <- observed_black_prop - observed_white_prop
+
+# Null distribution for difference in proportions (assuming no race effect)
+null_distribution <- filtered_gloucester %>%
+  specify(response = search_conducted) %>%
+  hypothesize(null = "paired independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "mean")
+
+# Calculate p-value for observed difference in proportions
+gloucester_p_value <- null_distribution %>%
+  get_p_value(obs_stat = observed_diff, direction = "two-sided")
+
+# Visualize the null distribution
+visualize(null_distribution) +
+  shade_p_value(obs_stat = observed_diff, direction = "two-sided") +
+  labs(title = "Null Distribution of Difference in Proportions (Black vs White)",
+       x = "Difference in Proportions",
+       y = "Count")
+
+```
+
+```{r}
+# Filter data for Black and White
+filtered_camden <- camden_data %>%
+  filter(subject_race %in% c("black", "white")) %>% 
+  filter(!is.na(search_conducted) & !is.na(subject_race))
+
+
+# Observed proportions for Black and White
+observed_props <- filtered_camden %>%
+  group_by(subject_race) %>%
+  summarize(prop_searched = mean(search_conducted), .groups = "drop")
+
+# Extract observed proportion for Black
+observed_black_prop <- observed_props %>%
+  filter(subject_race == "black") %>%
+  pull(prop_searched)
+
+# Extract observed proportion for White
+observed_white_prop <- observed_props %>%
+  filter(subject_race == "white") %>%
+  pull(prop_searched)
+
+# Observed difference in proportions (Black - White)
+observed_diff <- observed_black_prop - observed_white_prop
+
+# Null distribution for difference in proportions (assuming no race effect)
+null_distribution <- filtered_camden %>%
+  specify(response = search_conducted) %>%
+  hypothesize(null = "paired independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "mean")
+
+# Calculate p-value for observed difference in proportions
+camden_p_value <- null_distribution %>%
+  get_p_value(obs_stat = observed_diff, direction = "two-sided")
+
+# Visualize the null distribution
+visualize(null_distribution) +
+  shade_p_value(obs_stat = observed_diff, direction = "two-sided") +
+  labs(title = "Null Distribution of Difference in Proportions (Black vs White)",
+       x = "Difference in Proportions",
+       y = "Count")
+
+```
+
+```{r}
+# Filter data for Black and White
+filtered_cumberland <- cumberland_county_data %>%
+  filter(subject_race %in% c("black", "white")) %>% 
+  filter(!is.na(search_conducted) & !is.na(subject_race))
+
+
+# Observed proportions for Black and White
+observed_props <- filtered_cumberland %>%
+  group_by(subject_race) %>%
+  summarize(prop_searched = mean(search_conducted), .groups = "drop")
+
+# Extract observed proportion for Black
+observed_black_prop <- observed_props %>%
+  filter(subject_race == "black") %>%
+  pull(prop_searched)
+
+# Extract observed proportion for White
+observed_white_prop <- observed_props %>%
+  filter(subject_race == "white") %>%
+  pull(prop_searched)
+
+# Observed difference in proportions (Black - White)
+observed_diff <- observed_black_prop - observed_white_prop
+
+# Null distribution for difference in proportions (assuming no race effect)
+null_distribution <- filtered_cumberland %>%
+  specify(response = search_conducted) %>%
+  hypothesize(null = "paired independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "mean")
+
+# Calculate p-value for observed difference in proportions
+cumberland_p_value <- null_distribution %>%
+  get_p_value(obs_stat = observed_diff, direction = "two-sided")
+
+# Visualize the null distribution
+visualize(null_distribution) +
+  shade_p_value(obs_stat = observed_diff, direction = "two-sided") +
+  labs(title = "Null Distribution of Difference in Proportions (Black vs White)",
+       x = "Difference in Proportions",
+       y = "Count")
+
+```
+```{r}
+# Filter data for Black and White
+filtered_salem <- salem_county_data %>%
+  filter(subject_race %in% c("black", "white")) %>% 
+  filter(!is.na(search_conducted) & !is.na(subject_race))
+
+
+# Observed proportions for Black and White
+observed_props <- filtered_salem %>%
+  group_by(subject_race) %>%
+  summarize(prop_searched = mean(search_conducted), .groups = "drop")
+
+# Extract observed proportion for Black
+observed_black_prop <- observed_props %>%
+  filter(subject_race == "black") %>%
+  pull(prop_searched)
+
+# Extract observed proportion for White
+observed_white_prop <- observed_props %>%
+  filter(subject_race == "white") %>%
+  pull(prop_searched)
+
+# Observed difference in proportions (Black - White)
+observed_diff <- observed_black_prop - observed_white_prop
+
+# Null distribution for difference in proportions (assuming no race effect)
+null_distribution <- filtered_salem %>%
+  specify(response = search_conducted) %>%
+  hypothesize(null = "paired independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "mean")
+
+# Calculate p-value for observed difference in proportions
+salem_p_value <- null_distribution %>%
+  get_p_value(obs_stat = observed_diff, direction = "two-sided")
+
+# Visualize the null distribution
+visualize(null_distribution) +
+  shade_p_value(obs_stat = observed_diff, direction = "two-sided") +
+  labs(title = "Null Distribution of Difference in Proportions (Black vs White)",
+       x = "Difference in Proportions",
+       y = "Count")
+
+```
+
+```{r}
+# Filter data for Black and White
+filtered_capemay <- capemay_county_data %>%
+  filter(subject_race %in% c("black", "white")) %>% 
+  filter(!is.na(search_conducted) & !is.na(subject_race))
+
+
+# Observed proportions for Black and White
+observed_props <- filtered_capemay %>%
+  group_by(subject_race) %>%
+  summarize(prop_searched = mean(search_conducted), .groups = "drop")
+
+# Extract observed proportion for Black
+observed_black_prop <- observed_props %>%
+  filter(subject_race == "black") %>%
+  pull(prop_searched)
+
+# Extract observed proportion for White
+observed_white_prop <- observed_props %>%
+  filter(subject_race == "white") %>%
+  pull(prop_searched)
+
+# Observed difference in proportions (Black - White)
+observed_diff <- observed_black_prop - observed_white_prop
+
+# Null distribution for difference in proportions (assuming no race effect)
+null_distribution <- filtered_capemay %>%
+  specify(response = search_conducted) %>%
+  hypothesize(null = "paired independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "mean")
+
+# Calculate p-value for observed difference in proportions
+capemay_p_value <- null_distribution %>%
+  get_p_value(obs_stat = observed_diff, direction = "two-sided")
+
+# Visualize the null distribution
+visualize(null_distribution) +
+  shade_p_value(obs_stat = observed_diff, direction = "two-sided") +
+  labs(title = "Null Distribution of Difference in Proportions (Black vs White)",
+       x = "Difference in Proportions",
+       y = "Count")
+
+```
+
+
+```{r}
+# Filter data for Black and White
+filtered_philadelphia <- Philadelphia_data %>%
+  filter(subject_race %in% c("black", "white")) %>% 
+  filter(!is.na(search_conducted) & !is.na(subject_race))
+
+
+# Observed proportions for Black and White
+observed_props <- filtered_philadelphia %>%
+  group_by(subject_race) %>%
+  summarize(prop_searched = mean(search_conducted), .groups = "drop")
+
+# Extract observed proportion for Black
+observed_black_prop <- observed_props %>%
+  filter(subject_race == "black") %>%
+  pull(prop_searched)
+
+# Extract observed proportion for White
+observed_white_prop <- observed_props %>%
+  filter(subject_race == "white") %>%
+  pull(prop_searched)
+
+# Observed difference in proportions (Black - White)
+observed_diff <- observed_black_prop - observed_white_prop
+
+# Null distribution for difference in proportions (assuming no race effect)
+null_distribution <- filtered_philadelphia %>%
+  specify(response = search_conducted) %>%
+  hypothesize(null = "paired independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "mean")
+
+# Calculate p-value for observed difference in proportions
+philadelphia_p_value <- null_distribution %>%
+  get_p_value(obs_stat = observed_diff, direction = "two-sided")
+
+# Visualize the null distribution
+visualize(null_distribution) +
+  shade_p_value(obs_stat = observed_diff, direction = "two-sided") +
+  labs(title = "Null Distribution of Difference in Proportions (Black vs White)",
+       x = "Difference in Proportions",
+       y = "Count")
+
+```
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
