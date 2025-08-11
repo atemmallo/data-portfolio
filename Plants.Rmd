@@ -1,0 +1,158 @@
+---
+title: "Species_List"
+author: "Andrew Temmallo"
+date: "2024-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(readr)
+library(lubridate)
+library(ggplot2)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(readxl)
+commonnames <- read_excel("Lab/Data/commonnames.xlsx")
+View(commonnames)
+```
+
+
+```{r cars}
+library(readxl)
+Lab_Plant_List <- read_excel("Lab/Data/Lab Plant List.xlsx")
+View(Lab_Plant_List)
+```
+
+```{r}
+Lab_Plant_List <- Lab_Plant_List %>%
+  rename("USDA_Code" = `USDA Code`)
+```
+
+
+```{r}
+library(readxl)
+EICAT_Evaluated_Species_1_ <- read_excel("Lab/Data/EICAT Evaluated Species (1).xlsx")
+View(EICAT_Evaluated_Species_1_)
+```
+
+```{r}
+EICAT_Evaluated_Species_1_ <- EICAT_Evaluated_Species_1_ %>%
+  rename("USDA_Code" = `USDA Symbol`)
+```
+
+```{r}
+EICAT_Evaluated_Species_1_ <- EICAT_Evaluated_Species_1_ %>%
+  rename("Scientific Name" = "Species")
+```
+
+```{r}
+commonnames <- commonnames %>%
+  rename("Scientific Name" = full_name)
+```
+
+
+```{r}
+Northeast_Plants <- Lab_Plant_List %>% 
+  filter(State %in% c("MA","VM","CT","NH","ME","RI","NY")) 
+  
+Northeast_Plants <- full_join(Northeast_Plants, EICAT_Evaluated_Species_1_, by = c("Scientific Name", "USDA_Code"))
+```
+
+
+```{r}
+Northeast_Plants <- Northeast_Plants %>% 
+  group_by(`Scientific Name`)
+View(Northeast_Plants)
+Isolate_Northeast_Plant_Names <- unique(Northeast_Plants$`Scientific Name`)
+```
+
+
+
+```{r}
+Isolate_Northeast_Plant_Codes <- unique(Northeast_Plants$`USDA_Code`)
+print(Isolate_Northeast_Plant_Codes)
+```
+
+```{r}
+common_NE_Plants <- left_join(Northeast_Plants, commonnames, by = "Scientific Name", relationship = "many-to-many")
+```
+
+```{r}
+common_NE_Plants <- common_NE_Plants %>%
+  mutate(name_USDA_common = paste(`Scientific Name`, `USDA_Code`, usda_common, sep = ", "))
+
+```
+
+
+```{r}
+Isolate_NE_Common <- unique(common_NE_Plants$`name_USDA_common`)
+print(Isolate_NE_Common)
+```
+
+```{r}
+# Convert to data frame and separate into columns
+plants_df <- data.frame(plants = Isolate_NE_Common, stringsAsFactors = FALSE) %>%
+  tidyr::separate(plants, into = c("Scientific_Name", "USDA_Code", "Common_Name"), sep = ", ", fill = "right")
+
+# Filter out rows with NA in Common_Name if there's another row with the same Scientific_Name and USDA_Code and a non-NA Common_Name
+cleaned_df <- plants_df %>%
+  group_by(Scientific_Name, USDA_Code) %>%
+  filter(!(is.na(Common_Name) & any(!is.na(Common_Name)))) %>%
+  ungroup() %>%
+  distinct()
+
+cleaned_df <- cleaned_df %>%
+  group_by(Scientific_Name, Common_Name) %>%
+  filter(!(is.na(USDA_Code) & any(!is.na(USDA_Code)))) %>%
+  ungroup() %>%
+  distinct()
+
+cleaned_df <- cleaned_df %>%
+  group_by(USDA_Code, Common_Name) %>%
+  filter(!(is.na(Scientific_Name) & any(!is.na(Scientific_Name)))) %>%
+  ungroup() %>%
+  distinct()
+```
+```{r}
+# Prioritize rows with non-NA Common_Name and then remove duplicate Scientific_Name values
+unique_scientific_names_df <- cleaned_df %>%
+  arrange(Scientific_Name, desc(!is.na(Common_Name))) %>%
+  distinct(Scientific_Name, .keep_all = TRUE)
+
+# View the data frame with unique Scientific_Name values, prioritizing non-NA Common_Name
+print(unique_scientific_names_df)
+
+```
+
+
+```{r}
+install.packages("googlesheets4")
+```
+```{r}
+library(googlesheets4)
+
+unique_scientific_names_df %>%
+  write_sheet(
+    ss = gs4_get(
+      "https://docs.google.com/spreadsheets/d/1Iui81ctxi3h-hTecs-96j5Tez7W9rts8yJzInZqnB94/edit?usp=sharing" # Replace the access link to the spreadsheets
+    ),
+    sheet = "Invasive Plant List"
+  )
+
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
